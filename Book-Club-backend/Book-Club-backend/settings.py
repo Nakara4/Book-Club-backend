@@ -51,8 +51,12 @@ WSGI_APPLICATION = 'Book-Club-backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'bookclub_db'),
+        'USER': os.getenv('DB_USER', 'bookclub_user'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'bookclub_password123'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 
