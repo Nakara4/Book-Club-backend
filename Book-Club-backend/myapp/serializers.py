@@ -112,12 +112,24 @@ class BookClubListSerializer(serializers.ModelSerializer):
     creator = UserSerializer(read_only=True)
     member_count = serializers.ReadOnlyField()
     current_book = BookSimpleSerializer(read_only=True)
+    is_member = serializers.SerializerMethodField()
     
+    def get_is_member(self, obj):
+        """Check if current user is a member"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Membership.objects.filter(
+                user=request.user,
+                book_club=obj,
+                is_active=True
+            ).exists()
+        return False
+
     class Meta:
         model = BookClub
         fields = [
             'id', 'name', 'description', 'creator', 'is_private',
-            'member_count', 'current_book', 'created_at'
+            'member_count', 'current_book', 'created_at', 'is_member'
         ]
 
 
@@ -127,13 +139,25 @@ class BookClubDetailSerializer(serializers.ModelSerializer):
     members = MembershipSerializer(source='membership_set', many=True, read_only=True)
     member_count = serializers.ReadOnlyField()
     current_book = BookSimpleSerializer(read_only=True)
+    is_member = serializers.SerializerMethodField()
+
+    def get_is_member(self, obj):
+        """Check if current user is a member"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Membership.objects.filter(
+                user=request.user,
+                book_club=obj,
+                is_active=True
+            ).exists()
+        return False
     
     class Meta:
         model = BookClub
         fields = [
             'id', 'name', 'description', 'creator', 'members', 'is_private',
             'max_members', 'location', 'meeting_frequency', 'member_count',
-            'current_book', 'created_at', 'updated_at'
+            'current_book', 'created_at', 'updated_at', 'is_member'
         ]
 
 

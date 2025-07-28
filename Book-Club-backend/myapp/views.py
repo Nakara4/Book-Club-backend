@@ -266,10 +266,14 @@ class BookClubViewSet(ModelViewSet):
             role='member'
         )
         
-        serializer = BookClubMembershipSerializer(membership, context={'request': request})
+        # Get updated book club data with is_member flag
+        club_serializer = BookClubDetailSerializer(book_club, context={'request': request})
+        membership_serializer = BookClubMembershipSerializer(membership, context={'request': request})
+        
         return Response({
             'message': f'Successfully joined {book_club.name}!',
-            'membership': serializer.data
+            'membership': membership_serializer.data,
+            'book_club': club_serializer.data
         }, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['post'])

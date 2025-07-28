@@ -4,7 +4,7 @@ from . import views
 
 # Create router for ViewSets
 router = DefaultRouter()
-router.register(r'book-clubs', views.BookClubViewSet, basename='bookclub')
+router.register(r'bookclubs', views.BookClubViewSet, basename='bookclub')
 
 urlpatterns = [
     path('', views.home, name='home'),
