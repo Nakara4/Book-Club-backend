@@ -17,8 +17,31 @@ from .serializers import (
 )
 
 
+from django.http import JsonResponse
+
 def home(request):
-    return render(request, 'myapp/home.html', {'message': 'Welcome to My Django App!'})
+    return JsonResponse({
+        'message': 'Welcome to Book Club API!',
+        'status': 'running',
+        'version': '1.0.0',
+        'endpoints': {
+            'auth': {
+                'register': '/auth/register/',
+                'login': '/auth/login/',
+                'logout': '/auth/logout/',
+                'profile': '/auth/profile/',
+                'token': '/api/token/',
+                'token_refresh': '/api/token/refresh/',
+                'token_verify': '/api/token/verify/'
+            },
+            'bookclubs': {
+                'list': '/api/bookclubs/',
+                'search': '/api/book-clubs/search/',
+                'discover': '/api/book-clubs/discover/',
+                'my_memberships': '/api/my-memberships/'
+            }
+        }
+    })
 
 
 @api_view(['POST'])
@@ -137,7 +160,18 @@ class BookClubViewSet(ModelViewSet):
     - POST /book-clubs/{id}/invite/ - Invite user to club
     """
     queryset = BookClub.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action in ['list', 'retrieve', 'search']:
+            # Allow anyone to list and view book clubs
+            permission_classes = [permissions.AllowAny]
+        else:
+            # Require authentication for create, update, delete, join, leave, etc.
+            permission_classes = [permissions.IsAuthenticated]
+        
+        return [permission() for permission in permission_classes]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_private', 'creator']
     search_fields = ['name', 'description', 'location']

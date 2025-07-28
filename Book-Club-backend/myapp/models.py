@@ -83,6 +83,8 @@ class BookClub(models.Model):
     description = models.TextField()
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_clubs')
     members = models.ManyToManyField(User, related_name='book_clubs', through='Membership')
+    image = models.ImageField(upload_to='bookclub_images/', blank=True, null=True)
+    category = models.CharField(max_length=100, blank=True, null=True)
     is_private = models.BooleanField(default=False)
     max_members = models.PositiveIntegerField(default=50)
     location = models.CharField(max_length=200, blank=True, null=True)

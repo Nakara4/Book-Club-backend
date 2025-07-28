@@ -128,7 +128,7 @@ class BookClubListSerializer(serializers.ModelSerializer):
     class Meta:
         model = BookClub
         fields = [
-            'id', 'name', 'description', 'creator', 'is_private',
+            'id', 'name', 'description', 'creator', 'image', 'category', 'is_private',
             'member_count', 'current_book', 'created_at', 'is_member'
         ]
 
@@ -525,3 +525,32 @@ class BookListCreateUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['owner'] = self.context['request'].user
         return super().create(validated_data)
+
+
+# Analytics Serializers - Read-only for analytics data
+class BookClubBooksSerializer(serializers.Serializer):
+    """Serializer for book club books analytics data"""
+    book_club_id = serializers.IntegerField(read_only=True)
+    book_club_name = serializers.CharField(read_only=True)
+    book_count = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        read_only_fields = ['book_club_id', 'book_club_name', 'book_count']
+
+
+class BookSummariesSerializer(serializers.Serializer):
+    """Serializer for book summaries analytics data"""
+    book_id = serializers.IntegerField(read_only=True)
+    book_title = serializers.CharField(read_only=True)
+    review_count = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        read_only_fields = ['book_id', 'book_title', 'review_count']
+
+
+class ActiveClubsSerializer(serializers.Serializer):
+    """Serializer for active clubs analytics data"""
+    active_club_count = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        read_only_fields = ['active_club_count']
