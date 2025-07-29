@@ -385,7 +385,6 @@ class BookClubViewSet(ModelViewSet):
         )
         
         if serializer.is_valid():
-            # In a real application, you would send an email invitation here
             email = serializer.validated_data['email']
             message = serializer.validated_data.get('message', '')
             
