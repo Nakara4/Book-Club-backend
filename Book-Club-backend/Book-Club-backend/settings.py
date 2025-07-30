@@ -130,7 +130,13 @@ SIMPLE_JWT = {
 }
 
 # CORS settings for React frontend
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
-CORS_ALLOW_CREDENTIALS = True
+cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
+CORS_ALLOWED_ORIGINS = []
+for origin in cors_origins_raw.split(','):
+    origin = origin.strip()
+    if not origin.startswith(('http://', 'https://')):
+        origin = f'https://{origin}'
+    CORS_ALLOWED_ORIGINS.append(origin)
 
+CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
