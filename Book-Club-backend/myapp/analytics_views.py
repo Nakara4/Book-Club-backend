@@ -98,3 +98,66 @@ class ActiveClubsView(APIView):
         
         serializer = ActiveClubsSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminStatsView(APIView):
+    """
+    Combined admin stats endpoint that returns all analytics data.
+    GET /api/admin/stats/
+    """
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request):
+        # Get books per club data
+        book_clubs_data = BookClub.objects.annotate(
+            book_count=Count(
+                'reading_sessions',
+                filter=Q(reading_sessions__status='completed')
+            )
+        ).values(
+            'id',
+            'name', 
+            'book_count'
+        ).order_by('-book_count')
+        
+        books_data = []
+        for club in book_clubs_data:
+            books_data.append({
+                'book_club_id': club['id'],
+                'name': club['name'],
+                'book_count': club['book_count']
+            })
+        
+        # Get summaries per book data
+        books_summaries_data = Book.objects.annotate(
+            review_count=Count('reviews')
+        ).values(
+            'id',
+            'title',
+            'review_count'
+        ).filter(
+            review_count__gt=0
+        ).order_by('-review_count')
+        
+        summaries_data = []
+        for book in books_summaries_data:
+            summaries_data.append({
+                'book_id': book['id'],
+                'book_title': book['title'],
+                'review_count': book['review_count']
+            })
+        
+        # Get active clubs count
+        active_clubs_count = BookClub.objects.filter(
+            Q(reading_sessions__reviews__isnull=False) | 
+            Q(discussions__isnull=False)
+        ).distinct().count()
+        
+        # Combine all data
+        combined_data = {
+            'booksData': books_data,
+            'summariesData': summaries_data,
+            'activeClubsCount': active_clubs_count
+        }
+        
+        return Response(combined_data, status=status.HTTP_200_OK)

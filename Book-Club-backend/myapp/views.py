@@ -1,11 +1,13 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework import status, permissions, generics, filters
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from .serializers import CustomTokenObtainPairSerializer
 from django.db.models import Q, Count
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import BookClub, Membership
@@ -13,11 +15,15 @@ from .serializers import (
     UserRegistrationSerializer, UserSerializer, LoginSerializer,
     BookClubListSerializer, BookClubDetailSerializer, BookClubCreateUpdateSerializer,
     BookClubMembershipSerializer, BookClubJoinSerializer, BookClubInviteSerializer,
-    BookClubStatsSerializer, BookClubSearchSerializer
+    BookClubStatsSerializer, BookClubSearchSerializer, AdminUserSerializer
 )
-
+from rest_framework.exceptions import ValidationError
 
 from django.http import JsonResponse
+from .pagination import StandardResultsSetPagination, SearchResultsPagination
+from .api_settings import PAGINATION_CONFIG, DEFAULT_FILTER_BACKENDS, DEFAULT_PERMISSION_CLASSES
+from .exceptions import custom_exception_handler
+
 
 def home(request):
     return JsonResponse({
@@ -54,8 +60,8 @@ def register(request):
     if serializer.is_valid():
         user = serializer.save()
         
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
+        # Generate JWT tokens with custom claims
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
         access_token = refresh.access_token
         
         return Response({
@@ -67,7 +73,9 @@ def register(request):
             }
         }, status=status.HTTP_201_CREATED)
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Manually trigger custom exception handler for validation errors
+    exc = ValidationError(serializer.errors)
+    return custom_exception_handler(exc, {'request': request})
 
 
 @api_view(['POST'])
@@ -89,8 +97,8 @@ def login(request):
             user = authenticate(username=user.username, password=password)
             
             if user:
-                # Generate JWT tokens
-                refresh = RefreshToken.for_user(user)
+                # Generate JWT tokens with custom claims
+                refresh = CustomTokenObtainPairSerializer.get_token(user)
                 access_token = refresh.access_token
                 
                 return Response({
@@ -103,15 +111,17 @@ def login(request):
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({
-                    'error': 'Invalid credentials'
+                    'detail': 'Invalid credentials'  # Changed from 'error' to 'detail'
                 }, status=status.HTTP_401_UNAUTHORIZED)
                 
         except User.DoesNotExist:
             return Response({
-                'error': 'User with this email does not exist'
+                'detail': 'User with this email does not exist'  # Changed from 'error' to 'detail'
             }, status=status.HTTP_404_NOT_FOUND)
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Manually trigger custom exception handler for validation errors
+    exc = ValidationError(serializer.errors)
+    return custom_exception_handler(exc, {'request': request})
 
 
 @api_view(['GET'])
@@ -136,7 +146,7 @@ def logout(request):
         token.blacklist()
         return Response({'message': 'Successfully logged out'}, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)  # Changed from 'error' to 'detail'
 
 
 # ============================================================================
@@ -144,34 +154,9 @@ def logout(request):
 # ============================================================================
 
 class BookClubViewSet(ModelViewSet):
-    """
-    A comprehensive ViewSet for managing book clubs.
-    
-    Provides:
-    - GET /book-clubs/ - List all book clubs
-    - POST /book-clubs/ - Create a new book club
-    - GET /book-clubs/{id}/ - Get specific book club details
-    - PUT/PATCH /book-clubs/{id}/ - Update book club
-    - DELETE /book-clubs/{id}/ - Delete book club
-    - GET /book-clubs/my-clubs/ - Get user's book clubs
-    - POST /book-clubs/{id}/join/ - Join a book club
-    - POST /book-clubs/{id}/leave/ - Leave a book club
-    - GET /book-clubs/{id}/stats/ - Get club statistics
-    - POST /book-clubs/{id}/invite/ - Invite user to club
-    """
     queryset = BookClub.objects.all()
-    def get_permissions(self):
-        """
-        Instantiates and returns the list of permissions that this view requires.
-        """
-        if self.action in ['list', 'retrieve', 'search']:
-            # Allow anyone to list and view book clubs
-            permission_classes = [permissions.AllowAny]
-        else:
-            # Require authentication for create, update, delete, join, leave, etc.
-            permission_classes = [permissions.IsAuthenticated]
-        
-        return [permission() for permission in permission_classes]
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_private', 'creator']
     search_fields = ['name', 'description', 'location']
@@ -232,7 +217,7 @@ class BookClubViewSet(ModelViewSet):
         book_club = self.get_object()
         if book_club.creator != request.user:
             return Response(
-                {'error': 'Only the creator can delete this book club.'},
+                {'detail': 'Only the creator can delete this book club.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().destroy(request, *args, **kwargs)
@@ -275,21 +260,21 @@ class BookClubViewSet(ModelViewSet):
         # Check if user is already a member
         if Membership.objects.filter(user=user, book_club=book_club, is_active=True).exists():
             return Response(
-                {'error': 'You are already a member of this book club.'},
+                {'detail': 'You are already a member of this book club.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         # Check if club is at capacity
         if book_club.member_count >= book_club.max_members:
             return Response(
-                {'error': 'This book club is at full capacity.'},
+                {'detail': 'This book club is at full capacity.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         # Check if it's a private club (simplified - in real app you'd check invitations)
         if book_club.is_private and book_club.creator != user:
             return Response(
-                {'error': 'This is a private book club. You need an invitation to join.'},
+                {'detail': 'This is a private book club. You need an invitation to join.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -321,7 +306,7 @@ class BookClubViewSet(ModelViewSet):
         # Check if user is the creator
         if book_club.creator == user:
             return Response(
-                {'error': 'Club creators cannot leave their own clubs. Delete the club instead.'},
+                {'detail': 'Club creators cannot leave their own clubs. Delete the club instead.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -337,7 +322,7 @@ class BookClubViewSet(ModelViewSet):
         
         except Membership.DoesNotExist:
             return Response(
-                {'error': 'You are not a member of this book club.'},
+                {'detail': 'You are not a member of this book club.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -353,7 +338,7 @@ class BookClubViewSet(ModelViewSet):
             user=request.user, book_club=book_club, is_active=True
         ).exists() and book_club.creator != request.user:
             return Response(
-                {'error': 'You do not have permission to view statistics for this private club.'},
+                {'detail': 'You do not have permission to view statistics for this private club.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -375,7 +360,7 @@ class BookClubViewSet(ModelViewSet):
         
         if not membership or (membership.role == 'member' and book_club.creator != user):
             return Response(
-                {'error': 'You do not have permission to invite users to this book club.'},
+                {'detail': 'You do not have permission to invite users to this book club.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -399,11 +384,9 @@ class BookClubViewSet(ModelViewSet):
 
 
 class BookClubSearchView(generics.ListAPIView):
-    """
-    Advanced search view for book clubs with filters and user context
-    """
     serializer_class = BookClubSearchSerializer
-    permission_classes = [permissions.AllowAny]  # Allow anonymous users to search
+    permission_classes = [permissions.AllowAny]
+    pagination_class = SearchResultsPagination
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ['name', 'description', 'location', 'creator__username']
     filterset_fields = ['is_private']
@@ -429,6 +412,51 @@ class BookClubSearchView(generics.ListAPIView):
             Q(creator=user) |
             Q(id__in=user_memberships)
         ).distinct()
+
+
+    def get_exception_handler(self):
+        return custom_exception_handler
+
+
+# ============================================================================
+# ADMIN VIEWS
+# ============================================================================
+
+class AdminUserView(generics.ListAPIView, generics.UpdateAPIView):
+    """View for admin to list and promote users"""
+    queryset = User.objects.all().order_by('-date_joined')
+    serializer_class = AdminUserSerializer
+    permission_classes = [permissions.IsAdminUser]
+    pagination_class = StandardResultsSetPagination
+    lookup_url_kwarg = 'user_id'
+    
+    def get_queryset(self):
+        """Exclude superusers from the list"""
+        return User.objects.filter(is_superuser=False).order_by('-date_joined')
+    
+    def get_object(self):
+        """Get user object for updating"""
+        if 'user_id' not in self.kwargs:
+            return super().get_object()
+        
+        obj = get_object_or_404(self.get_queryset(), pk=self.kwargs['user_id'])
+        self.check_object_permissions(self.request, obj)
+        return obj
+    
+    def update(self, request, *args, **kwargs):
+        """Promote or demote a user to/from staff"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        action = "promoted to staff" if instance.is_staff else "demoted from staff"
+        return Response({
+            **serializer.data,
+            'message': f'User {instance.username} successfully {action}.'
+        })
+
 
 
 # ============================================================================

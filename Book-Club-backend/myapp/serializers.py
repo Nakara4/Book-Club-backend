@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
     Author, Genre, Book, BookClub, Membership, ReadingSession,
     Review, ReadingProgress, Discussion, DiscussionReply,
@@ -30,13 +31,41 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'date_joined')
-        read_only_fields = ('id', 'date_joined')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'date_joined', 'is_staff', 'is_superuser')
+        read_only_fields = ('id', 'date_joined', 'is_staff', 'is_superuser')
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Serializer for admin user operations (promoting users to staff)"""
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'is_superuser', 'date_joined')
+        read_only_fields = ('id', 'username', 'email', 'first_name', 'last_name', 'is_superuser', 'date_joined')
+    
+    def update(self, instance, validated_data):
+        """Only allow updating is_staff field"""
+        instance.is_staff = validated_data.get('is_staff', instance.is_staff)
+        instance.save()
+        return instance
 
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Custom JWT serializer that includes is_staff in the token payload
+    """
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        
+        # Add custom claims
+        token['is_staff'] = user.is_staff
+        
+        return token
 
 
 # Author Serializers
@@ -113,6 +142,7 @@ class BookClubListSerializer(serializers.ModelSerializer):
     member_count = serializers.ReadOnlyField()
     current_book = BookSimpleSerializer(read_only=True)
     is_member = serializers.SerializerMethodField()
+    image = serializers.ImageField(use_url=True, read_only=True)
     
     def get_is_member(self, obj):
         """Check if current user is a member"""
@@ -140,6 +170,7 @@ class BookClubDetailSerializer(serializers.ModelSerializer):
     member_count = serializers.ReadOnlyField()
     current_book = BookSimpleSerializer(read_only=True)
     is_member = serializers.SerializerMethodField()
+    image = serializers.ImageField(use_url=True, read_only=True)
 
     def get_is_member(self, obj):
         """Check if current user is a member"""
@@ -155,7 +186,7 @@ class BookClubDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = BookClub
         fields = [
-            'id', 'name', 'description', 'creator', 'members', 'is_private',
+            'id', 'name', 'description', 'creator', 'image', 'category', 'members', 'is_private',
             'max_members', 'location', 'meeting_frequency', 'member_count',
             'current_book', 'created_at', 'updated_at', 'is_member'
         ]
@@ -163,11 +194,12 @@ class BookClubDetailSerializer(serializers.ModelSerializer):
 
 class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer for creating/updating book clubs"""
+    image = serializers.ImageField(use_url=True, required=False)
     
     class Meta:
         model = BookClub
         fields = [
-            'name', 'description', 'is_private', 'max_members',
+            'name', 'description', 'image', 'category', 'is_private', 'max_members',
             'location', 'meeting_frequency'
         ]
     

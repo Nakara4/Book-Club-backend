@@ -1,0 +1,15 @@
+{
+  "name": "book-club-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Book Club",
+  "main": "index.js",
+  "scripts": {
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "cypress": "^9.5.0"
+  }
+}

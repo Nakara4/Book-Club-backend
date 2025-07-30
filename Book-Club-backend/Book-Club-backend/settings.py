@@ -7,7 +7,7 @@ SECRET_KEY = 'your-secret-key-here'  # Change this to a secure value
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -106,15 +106,23 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.FormParser',
         'rest_framework.parsers.MultiPartParser',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    # Custom pagination with frontend-friendly format
+    'DEFAULT_PAGINATION_CLASS': 'myapp.pagination.StandardResultsSetPagination',
+    'PAGE_SIZE': 12,  # Good for grid layouts (3x4, 4x3, 6x2, etc.)
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
-    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    # Custom exception handler for consistent error formatting { detail: "msg" }
+    'EXCEPTION_HANDLER': 'myapp.exceptions.custom_exception_handler',
     'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+    # Additional settings for better API experience
+    'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata',
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.AcceptHeaderVersioning',
+    'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S.%fZ',
+    'DATE_FORMAT': '%Y-%m-%d',
+    'TIME_FORMAT': '%H:%M:%S',
 }
 
 # SimpleJWT Configuration
@@ -153,21 +161,31 @@ SIMPLE_JWT = {
 }
 
 # CORS settings for React frontend
+# Development domains
 CORS_ALLOWED_ORIGINS = [
+    # Development domains
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:5173",
+    "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:5173",
-    "http://localhost:5174",
+    "http://localhost:5174",  # Alternative Vite port
     "http://127.0.0.1:5174",
-    "http://localhost:8000",
+    "http://localhost:8000",  # Django dev server
     "http://127.0.0.1:8000",
+    
+    # Production domains (update these with your actual domains)
+    # "https://yourdomain.com",
+    # "https://www.yourdomain.com",
+    # "https://api.yourdomain.com",
 ]
 
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in development
+# Security: Never allow all origins in production
+CORS_ALLOW_ALL_ORIGINS = False
 
-# Additional CORS settings for proper authentication
+# Allow credentials for cookie/session authentication
+CORS_ALLOW_CREDENTIALS = True
+
+# Additional CORS settings for proper authentication and credentials
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -178,6 +196,17 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    # Additional headers for authentication
+    'cache-control',
+    'x-requested-with',
+    'cookie',
+    'set-cookie',
+]
+
+# Expose headers that the frontend can access
+CORS_EXPOSE_HEADERS = [
+    'set-cookie',
+    'x-csrftoken',
 ]
 
 CORS_ALLOWED_METHODS = [
@@ -191,3 +220,13 @@ CORS_ALLOWED_METHODS = [
 
 # Ensure preflight requests work properly
 CORS_PREFLIGHT_MAX_AGE = 86400
+
+# Session and Cookie settings for credential support
+# These settings are important when using session authentication with CORS
+SESSION_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
+SESSION_COOKIE_HTTPONLY = True  # Prevent XSS attacks
+SESSION_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests with credentials
+CSRF_COOKIE_SECURE = not DEBUG  # Use secure CSRF cookies in production
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF token
+CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests with CSRF token
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
