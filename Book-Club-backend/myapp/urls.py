@@ -24,6 +24,16 @@ urlpatterns = [
     path('book-clubs/discover/', views.book_club_discovery, name='bookclub-discovery'),
     path('my-memberships/', views.my_club_memberships, name='my-memberships'),
     
+    # User Follow endpoints
+    path('users/', views.user_list, name='user-list'),
+    path('users/<int:user_id>/', views.user_profile, name='user-profile'),
+    path('users/<int:user_id>/followers/', views.user_followers, name='user-followers'),
+    path('users/<int:user_id>/following/', views.user_following, name='user-following'),
+    path('follow/', views.follow_user, name='follow-user'),
+    path('unfollow/', views.unfollow_user, name='unfollow-user'),
+    path('my-following/', views.my_following, name='my-following'),
+    path('my-followers/', views.my_followers, name='my-followers'),
+    
     # Admin Analytics endpoints
     path('admin/stats/', analytics_views.AdminStatsView.as_view(), name='admin-stats'),
     path('admin/analytics/books/', analytics_views.BooksPerClubView.as_view(), name='analytics-books-per-club'),

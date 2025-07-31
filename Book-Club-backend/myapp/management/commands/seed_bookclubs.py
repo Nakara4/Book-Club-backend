@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import datetime, timedelta
+import uuid
 
 class Command(BaseCommand):
     help = 'Seed the database with realistic book club data'
@@ -21,6 +22,7 @@ class Command(BaseCommand):
         self.seed_users()
         self.seed_authors_and_genres()
         self.seed_books()
+        self.seed_categories()
         self.seed_book_clubs()
         self.seed_reading_sessions()
         self.seed_discussions_and_reviews()
@@ -161,6 +163,18 @@ class Command(BaseCommand):
             book.authors.set(random.sample(authors, k=random.randint(1, 2)))
             book.genres.set(random.sample(genres, k=random.randint(1, 2)))
 
+    def seed_categories(self):
+        self.stdout.write('Creating categories...')
+        categories_data = [
+            {'name': 'Sci-Fi', 'description': 'Explore futuristic worlds and technology.', 'banner_url': 'https://unsplash.com/photos/csK5XPO87lI'},
+            {'name': 'Mystery', 'description': 'Solve dark and thrilling mysteries.', 'banner_url': 'https://unsplash.com/photos/JyVcAIUAcPM'},
+            {'name': 'BIPOC Voices', 'description': 'Celebrate diverse voices and stories.', 'banner_url': 'https://unsplash.com/photos/z_MB34fPK6s'},
+            {'name': 'Queer Lit', 'description': 'Explore LGBTQ+ narratives and themes.', 'banner_url': 'https://unsplash.com/photos/9p3ZMa5guP4'},
+            {'name': 'Manga', 'description': 'Dive into captivating Japanese comics and novels.', 'banner_url': 'https://unsplash.com/photos/NfFFkmktfo4'},
+        ]
+        for category in categories_data:
+            Genre.objects.get_or_create(name=category['name'], defaults={'description': category['description']})
+
     def seed_book_clubs(self):
         self.stdout.write('Creating book clubs...')
         fake = Faker()
@@ -178,62 +192,79 @@ class Command(BaseCommand):
             'Fiction': 'bookclub_images/classic_club.jpg'
         }
         
-        # Realistic book club names and descriptions
+        # Virtual and location-based club flags
+        virtual_locations = ['Virtual Meetup', 'Online Zoom', 'Discord Channel']
+        in_person_locations = ['Downtown Library', 'Cozy Corner Café', 'Tech Hub Community Center']
+        
         book_clubs_data = [
             {
                 'name': 'Mystery Lovers United',
                 'description': 'Dive into thrilling mysteries, solve puzzles, and discuss plot twists with fellow detective fiction enthusiasts. From Agatha Christie classics to modern Nordic noir.',
                 'category': 'Mystery',
-                'location': 'Downtown Library',
+                'location': random.choice(in_person_locations + virtual_locations),
                 'frequency': 'Monthly'
             },
             {
-                'name': 'Romantic Reads & Wine',
-                'description': 'Share heartwarming romances over a glass of wine. We explore contemporary romance, historical fiction, and everything that makes our hearts flutter.',
-                'category': 'Romance', 
-                'location': 'Cozy Corner Café',
+                'name': 'Sci-Fi Galaxy',
+                'description': 'Journey through galaxies, explore futuristic worlds, and discuss the possibilities of tomorrow. Perfect for fans of hard sci-fi and space opera.',
+                'category': 'Sci-Fi',
+                'location': random.choice(in_person_locations + virtual_locations),
+                'frequency': 'Monthly'
+            },
+            {
+                'name': 'BIPOC Voices Book Club',
+                'description': 'Amplifying diverse voices and celebrating stories from Black, Indigenous, and People of Color authors. Explore rich narratives that challenge and inspire.',
+                'category': 'BIPOC Voices',
+                'location': random.choice(in_person_locations + virtual_locations),
                 'frequency': 'Bi-weekly'
             },
             {
-                'name': 'Sci-Fi Explorers',
-                'description': 'Journey through galaxies, explore futuristic worlds, and discuss the possibilities of tomorrow. Perfect for fans of hard sci-fi and space opera.',
-                'category': 'Science Fiction',
-                'location': 'Tech Hub Community Center',
+                'name': 'Queer Literature Circle',
+                'description': 'Celebrating LGBTQ+ narratives, themes, and authors. A safe space to explore identity, love, and community through powerful storytelling.',
+                'category': 'Queer Lit',
+                'location': random.choice(in_person_locations + virtual_locations),
                 'frequency': 'Monthly'
             },
             {
-                'name': 'Literary Ladies',
-                'description': 'A supportive community of women readers exploring literary fiction, memoirs, and thought-provoking narratives that challenge and inspire.',
-                'category': 'Literary Fiction',
-                'location': 'Riverside Park Pavilion',
-                'frequency': 'Monthly'
+                'name': 'Manga & Light Novel Society',
+                'description': 'Dive into captivating Japanese comics, light novels, and graphic novels. From slice-of-life to epic adventures in manga form.',
+                'category': 'Manga',
+                'location': random.choice(in_person_locations + virtual_locations),
+                'frequency': 'Bi-weekly'
             },
             {
                 'name': 'Fantasy & Magic Circle',
                 'description': 'Escape to magical realms, meet dragons and wizards, and discuss epic fantasy adventures. From Tolkien to modern fantasy authors.',
                 'category': 'Fantasy',
-                'location': 'Game & Book Café',
+                'location': random.choice(in_person_locations + virtual_locations),
                 'frequency': 'Monthly'
             },
             {
                 'name': 'Young Adult Adventures',
                 'description': 'Exploring coming-of-age stories, dystopian futures, and young love. Perfect for readers who love YA fiction and nostalgic about teen years.',
                 'category': 'Young Adult',
-                'location': 'University Student Center',
+                'location': random.choice(in_person_locations + virtual_locations),
                 'frequency': 'Weekly'
             },
             {
-                'name': 'Non-Fiction Knowledge Seekers',
-                'description': 'Expand your mind with biographies, history, science, and self-improvement books. Learn something new with every meeting.',
-                'category': 'Non-Fiction',
-                'location': 'Community Learning Center',
+                'name': 'Literary Fiction Lovers',
+                'description': 'A supportive community exploring literary fiction, memoirs, and thought-provoking narratives that challenge and inspire.',
+                'category': 'Literary Fiction',
+                'location': random.choice(in_person_locations + virtual_locations),
                 'frequency': 'Monthly'
+            },
+            {
+                'name': 'Romance Readers Society',
+                'description': 'Share heartwarming romances and swoon-worthy love stories. We explore contemporary romance, historical fiction, and everything that makes hearts flutter.',
+                'category': 'Romance',
+                'location': random.choice(in_person_locations + virtual_locations),
+                'frequency': 'Bi-weekly'
             },
             {
                 'name': 'Classic Literature Society',
                 'description': 'Rediscover timeless classics and explore the greatest works of literature. From Shakespeare to Dickens, we celebrate literary heritage.',
                 'category': 'Fiction',
-                'location': 'Historic Library Main Hall',
+                'location': random.choice(in_person_locations + virtual_locations),
                 'frequency': 'Monthly'
             }
         ]
@@ -255,12 +286,21 @@ class Command(BaseCommand):
                 is_private=random.choice([True, False])
             )
             
-            # Add members to the club
+            # Add creator as admin first
+            Membership.objects.create(
+                user=creator,
+                book_club=club,
+                role='admin',
+                joined_at=fake.date_time_between(start_date='-1y', end_date='-6m', tzinfo=timezone.get_current_timezone())
+            )
+            
+            # Add other members to the club
             member_count = random.randint(8, 25)
-            members = random.sample(users, min(member_count, len(users)))
+            other_users = [u for u in users if u != creator]
+            members = random.sample(other_users, min(member_count, len(other_users)))
             
             for member in members:
-                role = 'admin' if member == creator else random.choices(
+                role = random.choices(
                     ['member', 'moderator'], weights=[0.8, 0.2]
                 )[0]
                 
@@ -277,34 +317,31 @@ class Command(BaseCommand):
         book_clubs = list(BookClub.objects.all())
         books = list(Book.objects.all())
         
-        for club in book_clubs[:5]:  # Create sessions for first 5 clubs
-            # Current reading session
-            current_book = random.choice(books)
-            start_date = timezone.now().date() - timedelta(days=random.randint(5, 20))
-            end_date = start_date + timedelta(days=random.randint(20, 45))
-            
-            ReadingSession.objects.create(
-                book_club=club,
-                book=current_book,
-                start_date=start_date,
-                end_date=end_date,
-                status='current',
-                notes=fake.text(max_nb_chars=200)
-            )
-            
-            # Past reading session
-            past_book = random.choice([b for b in books if b != current_book])
-            past_start = start_date - timedelta(days=random.randint(30, 60))
-            past_end = past_start + timedelta(days=random.randint(20, 40))
-            
-            ReadingSession.objects.create(
-                book_club=club,
-                book=past_book,
-                start_date=past_start,
-                end_date=past_end,
-                status='completed',
-                notes=fake.text(max_nb_chars=200)
-            )
+        for club in book_clubs:
+            # Create 3-6 upcoming sessions
+            for i in range(random.randint(3, 6)):
+                book_choice = random.choice(books)
+                start_date = timezone.now().date() + timedelta(days=random.randint(5, 30) + (i * 30))
+                end_date = start_date + timedelta(days=random.randint(20, 45))
+                
+                # Generate meeting date within reading period
+                meeting_date = fake.date_time_between(
+                    start_date=start_date, 
+                    end_date=end_date, 
+                    tzinfo=timezone.get_current_timezone()
+                )
+                
+                ReadingSession.objects.create(
+                    book_club=club,
+                    book=book_choice,
+                    start_date=start_date,
+                    end_date=end_date,
+                    status='upcoming',
+                    notes=fake.text(max_nb_chars=200),
+                    meeting_date=meeting_date,
+                    meeting_location=club.location,
+                    meeting_notes=fake.text(max_nb_chars=100)
+                )
 
     def seed_discussions_and_reviews(self):
         self.stdout.write('Creating discussions and reviews...')

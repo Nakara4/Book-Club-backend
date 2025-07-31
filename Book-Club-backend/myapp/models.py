@@ -1,7 +1,45 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
 from django.utils import timezone
+
+
+class UserProfile(models.Model):
+    """User profile model to extend User with additional fields"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    bio = models.TextField(blank=True, null=True)
+    location = models.CharField(max_length=100, blank=True, null=True)
+    website = models.URLField(blank=True, null=True)
+    image_url = models.CharField(max_length=500, blank=True, null=True, help_text="URL for external profile image")
+    image_updated_at = models.DateTimeField(blank=True, null=True, help_text="When the profile image was last updated")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['user__username']
+    
+    def __str__(self):
+        return f"{self.user.username}'s Profile"
+
+
+class BookManager(models.Manager):
+    """Custom manager for Book model with external ID support"""
+    
+    def get_or_create_by_external_id(self, external_id, source, defaults=None):
+        """
+        Get or create a book by external ID and source.
+        Returns tuple (book, created)
+        """
+        if defaults is None:
+            defaults = {}
+        
+        try:
+            book = self.get(external_id=external_id, source=source)
+            return book, False
+        except self.model.DoesNotExist:
+            book = self.create(external_id=external_id, source=source, **defaults)
+            return book, True
 
 
 class Author(models.Model):
@@ -42,6 +80,14 @@ class Genre(models.Model):
 
 class Book(models.Model):
     """Model to store book information"""
+    # Source choices for external IDs
+    SOURCE_CHOICES = [
+        ('openlibrary', 'Open Library'),
+        ('googlebooks', 'Google Books'),
+        ('goodreads', 'Goodreads'),
+        ('manual', 'Manual Entry'),
+    ]
+    
     title = models.CharField(max_length=200)
     subtitle = models.CharField(max_length=200, blank=True, null=True)
     authors = models.ManyToManyField(Author, related_name='books')
@@ -53,14 +99,29 @@ class Book(models.Model):
     page_count = models.PositiveIntegerField(blank=True, null=True)
     language = models.CharField(max_length=50, default='English')
     cover_image = models.ImageField(upload_to='book_covers/', blank=True, null=True)
+    image_url = models.CharField(max_length=500, blank=True, null=True, help_text="URL for external book cover image")
+    image_updated_at = models.DateTimeField(blank=True, null=True, help_text="When the book cover image was last updated")
     genres = models.ManyToManyField(Genre, related_name='books', blank=True)
     goodreads_url = models.URLField(blank=True, null=True)
     amazon_url = models.URLField(blank=True, null=True)
+    # External ID fields for idempotent seeding
+    external_id = models.CharField(max_length=100, blank=True, null=True, help_text="External API ID (Open Library, Google Books, etc.)")
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='manual', help_text="Source of the book data")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Use custom manager
+    objects = BookManager()
 
     class Meta:
         ordering = ['title']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['external_id', 'source'],
+                condition=models.Q(external_id__isnull=False),
+                name='unique_external_id_source'
+            )
+        ]
 
     def __str__(self):
         return self.title
@@ -77,23 +138,65 @@ class Book(models.Model):
         return None
 
 
+class BookClubManager(models.Manager):
+    """Custom manager for BookClub model"""
+    
+    def get_or_create_by_external_id(self, external_id, source, defaults=None):
+        """
+        Get or create a book club by external ID and source.
+        Returns tuple (book_club, created)
+        """
+        if defaults is None:
+            defaults = {}
+        
+        try:
+            book_club = self.get(external_id=external_id, source=source)
+            return book_club, False
+        except self.model.DoesNotExist:
+            book_club = self.create(external_id=external_id, source=source, **defaults)
+            return book_club, True
+
+
 class BookClub(models.Model):
     """Model to represent a book club"""
+    # Source choices for external IDs (if importing from other platforms)
+    SOURCE_CHOICES = [
+        ('goodreads', 'Goodreads'),
+        ('facebook', 'Facebook Groups'),
+        ('meetup', 'Meetup'),
+        ('manual', 'Manual Entry'),
+    ]
+    
     name = models.CharField(max_length=200)
     description = models.TextField()
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_clubs')
     members = models.ManyToManyField(User, related_name='book_clubs', through='Membership')
     image = models.ImageField(upload_to='bookclub_images/', blank=True, null=True)
+    image_url = models.CharField(max_length=500, blank=True, null=True, help_text="URL for external book club image")
+    image_updated_at = models.DateTimeField(blank=True, null=True, help_text="When the book club image was last updated")
     category = models.CharField(max_length=100, blank=True, null=True)
     is_private = models.BooleanField(default=False)
     max_members = models.PositiveIntegerField(default=50)
     location = models.CharField(max_length=200, blank=True, null=True)
     meeting_frequency = models.CharField(max_length=100, blank=True, null=True)  # e.g., "Monthly", "Bi-weekly"
+    # External ID fields for idempotent seeding
+    external_id = models.CharField(max_length=100, blank=True, null=True, help_text="External platform ID")
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='manual', help_text="Source of the book club data")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Use custom manager
+    objects = BookClubManager()
 
     class Meta:
         ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['external_id', 'source'],
+                condition=models.Q(external_id__isnull=False),
+                name='unique_bookclub_external_id_source'
+            )
+        ]
 
     def __str__(self):
         return self.name
@@ -375,3 +478,31 @@ class BookList(models.Model):
     @property
     def book_count(self):
         return self.books.count()
+
+
+class Follow(models.Model):
+    """Model for user following system"""
+    follower = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='following'
+    )
+    following = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='followers'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['follower', 'following']
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.follower.username} follows {self.following.username}"
+
+    def save(self, *args, **kwargs):
+        # Prevent users from following themselves
+        if self.follower == self.following:
+            raise ValidationError("Users cannot follow themselves")
+        super().save(*args, **kwargs)

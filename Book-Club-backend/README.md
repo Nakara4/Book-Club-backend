@@ -316,8 +316,30 @@ For production deployment, ensure you:
 
 4. **Collect static files:**
    ```bash
-   python manage.py collectstatic --noinput
+python manage.py collectstatic --noinput
+
+### Re-seeding the Database via Render
+
+To re-seed the database without duplications during a Render manual deployment, follow these steps:
+
+1. Go to the Render dashboard and navigate to the "Manual Deploy" section of your web service.
+2. Execute the following build command:
+
+   ```sh
+   ./render-build.sh # This automatically skips seeding if SEED_ON_STARTUP is false
    ```
+
+3. To explicitly run the seeding, enable the environment variable `SEED_ON_STARTUP` or run the following command:
+
+   ```sh
+   python manage.py master_seed --level=production --reset
+   ```
+
+   This will reset and run the master seed process, avoiding duplicates by flushing tables first if `--reset` is used.
+
+4. Confirm the deployment and ensure logs indicate successful seeding.
+
+> **📖 For detailed Render deployment instructions, see [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)**
 
 ### Docker Deployment
 
@@ -362,6 +384,259 @@ For additional support:
 - Review test files for usage examples
 - Check Django and DRF documentation for framework-specific issues
 
+## Seeding Architecture
+
+The Book Club backend includes a comprehensive seeding system for populating the database with realistic test data. The system is designed to be modular, scalable, and production-ready.
+
+### Architecture Overview
+
+```mermaid
+flowchart TD
+    A[Master Seed Command] --> B[Seed Users]
+    A --> C[Seed Books]
+    A --> D[Seed Book Clubs]
+    A --> E[Seed Discussions/Reviews/Progress]
+    
+    B --> B1[User Profiles]
+    B --> B2[Reading History]
+    B --> B3[Club Memberships]
+    
+    C --> C1[Open Library API]
+    C --> C2[Book Metadata]
+    C --> C3[Cover Images]
+    C --> C4[Authors & Genres]
+    
+    D --> D1[Club Categories]
+    D --> D2[Member Assignments]
+    D --> D3[Reading Sessions]
+    
+    E --> E1[Discussion Threads]
+    E --> E2[Book Reviews]
+    E --> E3[Reading Progress]
+    E --> E4[Recommendations]
+    
+    F[Image Validation] --> F1[URL Verification]
+    F --> F2[404 Detection]
+    F --> F3[Placeholder Replacement]
+```
+
+### Seeding Commands
+
+#### 1. Master Seed Command
+**Usage:** `python manage.py master_seed [--level basic|full|production] [--reset]`
+
+Orchestrates all seeding operations in the correct order with transaction safety.
+
+**Levels:**
+- `basic`: Minimal data for development (10 users, 20 books, 5 clubs)
+- `full`: Complete dataset for testing (50 users, 100 books, 15 clubs)
+- `production`: Optimized for demos (25 users, 50 books, 8 clubs)
+
+#### 2. Seed Books Command
+**Usage:** `python manage.py seed_books file.csv [options]`
+
+Loads books from CSV/JSON files with Open Library API integration.
+
+**Features:**
+- CSV and JSON file support
+- Open Library API integration for metadata
+- Automatic cover image resolution
+- ISBN validation and normalization
+- Genre mapping from subjects
+- Idempotent operations (prevents duplicates)
+- Batch processing with progress bars
+
+**CSV Format:**
+```csv
+title,author,published_year,isbn13,description,pages
+"Pride and Prejudice","Jane Austen",1813,9780141439518,"A romantic novel",432
+```
+
+#### 3. Seed Users Command
+**Usage:** `python manage.py seed_users [--count N] [--goodreads-csv file.csv]`
+
+Creates diverse, realistic user profiles with international representation.
+
+**Features:**
+- Multi-locale user generation (20+ countries)
+- Realistic bio generation
+- Reading history from Goodreads CSV
+- Book club role assignments
+- Avatar URL generation
+- Batch processing for performance
+
+#### 4. Seed Discussions/Reviews/Progress Command
+**Usage:** `python manage.py seed_discussions_reviews_progress [options]`
+
+Generates realistic user-generated content and reading activity.
+
+**Features:**
+- Book-specific discussion content
+- Bell curve rating distribution
+- Reading progress snapshots
+- Collaborative filtering recommendations
+- Threaded discussion replies
+
+#### 5. Image Validation Command
+**Usage:** `python manage.py validate_images [--dry-run] [--models books,users,bookclubs]`
+
+Validates and maintains image URLs across the platform.
+
+**Features:**
+- Weekly URL validation
+- Concurrent request handling
+- 404 detection and replacement
+- Placeholder image generation
+- Batch processing with rate limiting
+
+### Data Flow
+
+1. **Initialization**: Master seed command starts transaction
+2. **User Creation**: Generate diverse user profiles with realistic data
+3. **Book Import**: Load books from external files with API enhancement
+4. **Club Formation**: Create book clubs and assign members
+5. **Content Generation**: Create discussions, reviews, and reading progress
+6. **Image Validation**: Verify and maintain all image URLs
+7. **Completion**: Commit transaction and report statistics
+
+### API Integration
+
+#### Open Library API
+- **Search Endpoint**: `/search.json` for book discovery
+- **Works Endpoint**: `/works/{id}.json` for detailed metadata
+- **Covers API**: `covers.openlibrary.org` for cover images
+- **Rate Limiting**: 500ms between requests with exponential backoff
+- **Error Handling**: Graceful degradation when API is unavailable
+
+#### Image Services
+- **Primary**: Open Library covers
+- **Fallback**: Google Books API
+- **Placeholders**: Unsplash book-themed images
+- **User Avatars**: DiceBear avatar generation
+
+### Error Handling & Resilience
+
+- **Transaction Safety**: All operations wrapped in database transactions
+- **Graceful Degradation**: Continue seeding even when external APIs fail
+- **Retry Logic**: Exponential backoff for network requests
+- **Validation**: Input sanitization and data validation
+- **Logging**: Comprehensive logging for debugging
+- **Dry Run Mode**: Test operations without database changes
+
+### Performance Optimizations
+
+- **Batch Processing**: Process records in configurable batches
+- **Concurrent Requests**: Parallel API calls with thread pooling
+- **Database Optimization**: Bulk creates and select_related queries
+- **Memory Management**: Stream processing for large files
+- **Progress Tracking**: Real-time progress bars with tqdm
+
+### Troubleshooting Guide
+
+#### Common Issues
+
+**1. "File not found" error when seeding books**
+```bash
+# Solution: Check file path and permissions
+ls -la path/to/your/file.csv
+python manage.py seed_books sample_books.csv --dry-run
+```
+
+**2. Open Library API timeouts**
+```bash
+# Solution: Increase delay between requests
+python manage.py seed_books file.csv --delay 1.0
+```
+
+**3. Memory issues with large datasets**
+```bash
+# Solution: Reduce batch size
+python manage.py seed_books file.csv --batch-size 50
+```
+
+**4. Duplicate book entries**
+```bash
+# Solution: Use update existing flag
+python manage.py seed_books file.csv --update-existing
+```
+
+**5. Image validation failures**
+```bash
+# Solution: Run with error details
+python manage.py validate_images --dry-run --max-workers 1
+```
+
+#### Debug Commands
+
+```bash
+# Test seeding with minimal data
+python manage.py master_seed --level basic --dry-run
+
+# Validate single model images
+python manage.py validate_images --models books --force
+
+# Check API connectivity
+python manage.py seed_books sample_books.csv --batch-size 1 --dry-run
+
+# Clear and reseed specific data
+python manage.py seed_users --clear --count 5
+```
+
+#### Logging Configuration
+
+Add to `settings.py` for detailed seeding logs:
+
+```python
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'seeding.log',
+        },
+    },
+    'loggers': {
+        'myapp.management.commands': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
+```
+
+#### Performance Monitoring
+
+```bash
+# Monitor seeding performance
+time python manage.py master_seed --level full
+
+# Check database size after seeding
+python manage.py dbshell
+# SELECT COUNT(*) FROM myapp_book;
+# SELECT COUNT(*) FROM myapp_user;
+```
+
+### Testing
+
+Run comprehensive tests for all seeding commands:
+
+```bash
+# Run all seeding tests
+pytest myapp/tests/test_seed_*.py -v
+
+# Run specific command tests
+pytest myapp/tests/test_seed_books.py::TestSeedBooksCommand -v
+
+# Run integration tests
+pytest myapp/tests/ -m integration
+
+# Run with coverage
+pytest --cov=myapp.management.commands myapp/tests/
+```
+
 ## Project Structure
 
 ```
@@ -369,19 +644,38 @@ Book-Club-backend/
 ├── myapp/                     # Main Django application
 │   ├── management/
 │   │   └── commands/
-│   │       └── create_initial_admin.py
+│   │       ├── create_initial_admin.py
+│   │       ├── master_seed.py         # Master seeding orchestrator
+│   │       ├── seed_books.py          # Book seeding with API integration
+│   │       ├── seed_users.py          # User profile seeding
+│   │       ├── seed_discussions_reviews_progress.py
+│   │       ├── seed_bookclubs.py      # Book club seeding
+│   │       └── validate_images.py     # Image URL validation
+│   ├── tests/                 # Comprehensive test suite
+│   │   ├── __init__.py
+│   │   ├── factories.py       # Test data factories
+│   │   ├── test_seed_books.py
+│   │   ├── test_seed_users.py
+│   │   ├── test_seed_discussions_reviews_progress.py
+│   │   ├── test_master_seed.py
+│   │   └── test_validate_images.py
 │   ├── templates/
 │   ├── models.py
 │   ├── views.py
 │   ├── analytics_views.py
 │   ├── serializers.py
 │   └── urls.py
+├── library/
+│   └── images.py              # Image handling utilities
 ├── cypress/                   # End-to-end tests
 │   └── integration/
 │       └── admin_dashboard.spec.js
-├── test_*.py                  # Backend test files
+├── test_*.py                  # Additional backend test files
+├── sample_books.csv           # Sample data for seeding
+├── books.csv                  # Additional book data
 ├── requirements.txt           # Python dependencies
 ├── package.json              # Node.js dependencies
+├── pytest.ini               # Pytest configuration
 ├── manage.py                 # Django management script
 ├── .env.example              # Environment variables template
 └── README.md                 # This file

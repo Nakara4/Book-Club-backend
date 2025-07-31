@@ -129,6 +129,9 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
 }
 
+# Seeding configuration
+SEED_ON_STARTUP = os.getenv('SEED_ON_STARTUP', 'False').lower() == 'true'
+
 # CORS settings for React frontend
 cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
 CORS_ALLOWED_ORIGINS = []

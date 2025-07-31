@@ -131,3 +131,48 @@ dmypy.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Project specific
+media/
+static/
+staticfiles/
+
+# Backup files
+*.bak
+*.backup
+backup.json
+
+# Development databases
+*.sqlite3
+*.db
+
+# Security scan reports
+bandit-report.json
+safety-report.json
+
+# Logs
+logs/
+*.log
+django.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# macOS
+.DS_Store?
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Node.js (if frontend is added later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

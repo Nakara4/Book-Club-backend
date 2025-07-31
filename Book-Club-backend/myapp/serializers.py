@@ -5,7 +5,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
     Author, Genre, Book, BookClub, Membership, ReadingSession,
     Review, ReadingProgress, Discussion, DiscussionReply,
-    BookRecommendation, BookList
+    BookRecommendation, BookList, Follow
 )
 
 
@@ -586,3 +586,90 @@ class ActiveClubsSerializer(serializers.Serializer):
     
     class Meta:
         read_only_fields = ['active_club_count']
+
+
+# Follow Serializers
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Enhanced user serializer with follow stats"""
+    followers_count = serializers.SerializerMethodField()
+    following_count = serializers.SerializerMethodField()
+    is_following = serializers.SerializerMethodField()
+    is_followed_by = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name', 'date_joined',
+            'followers_count', 'following_count', 'is_following', 'is_followed_by'
+        ]
+        read_only_fields = [
+            'id', 'username', 'email', 'date_joined', 'followers_count', 
+            'following_count', 'is_following', 'is_followed_by'
+        ]
+    
+    def get_followers_count(self, obj):
+        """Get number of followers"""
+        return obj.followers.count()
+    
+    def get_following_count(self, obj):
+        """Get number of users this user is following"""
+        return obj.following.count()
+    
+    def get_is_following(self, obj):
+        """Check if current user is following this user"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and request.user != obj:
+            return Follow.objects.filter(
+                follower=request.user, 
+                following=obj
+            ).exists()
+        return False
+    
+    def get_is_followed_by(self, obj):
+        """Check if this user is following the current user"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and request.user != obj:
+            return Follow.objects.filter(
+                follower=obj, 
+                following=request.user
+            ).exists()
+        return False
+
+
+class FollowSerializer(serializers.ModelSerializer):
+    """Serializer for Follow model"""
+    follower = UserSerializer(read_only=True)
+    following = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = Follow
+        fields = ['id', 'follower', 'following', 'created_at']
+        read_only_fields = ['id', 'follower', 'following', 'created_at']
+
+
+class FollowActionSerializer(serializers.Serializer):
+    """Serializer for follow/unfollow actions"""
+    user_id = serializers.IntegerField()
+    
+    def validate_user_id(self, value):
+        """Validate that the user exists and is not the current user"""
+        try:
+            user = User.objects.get(id=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User does not exist.")
+        
+        request = self.context.get('request')
+        if request and request.user.id == value:
+            raise serializers.ValidationError("You cannot follow yourself.")
+        
+        return value
+
+
+class FollowListSerializer(serializers.ModelSerializer):
+    """Serializer for listing followers/following"""
+    user = UserProfileSerializer(read_only=True)
+    
+    class Meta:
+        model = Follow
+        fields = ['id', 'user', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']

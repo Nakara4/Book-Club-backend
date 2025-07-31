@@ -8,14 +8,15 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from .serializers import CustomTokenObtainPairSerializer
-from django.db.models import Q, Count
+from django.db.models import Q, Count, F, Case, When, Value, IntegerField
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import BookClub, Membership
+from .models import BookClub, Membership, Follow
 from .serializers import (
     UserRegistrationSerializer, UserSerializer, LoginSerializer,
     BookClubListSerializer, BookClubDetailSerializer, BookClubCreateUpdateSerializer,
     BookClubMembershipSerializer, BookClubJoinSerializer, BookClubInviteSerializer,
-    BookClubStatsSerializer, BookClubSearchSerializer, AdminUserSerializer
+    BookClubStatsSerializer, BookClubSearchSerializer, AdminUserSerializer,
+    UserProfileSerializer, FollowSerializer, FollowActionSerializer, FollowListSerializer
 )
 from rest_framework.exceptions import ValidationError
 
@@ -514,4 +515,248 @@ def book_club_discovery(request):
         'recent': BookClubSearchSerializer(recent_clubs, many=True, context=context).data,
         'popular': BookClubSearchSerializer(popular_clubs, many=True, context=context).data,
         'total_public_clubs': BookClub.objects.filter(is_private=False).count()
+    })
+
+
+# ============================================================================
+# USER FOLLOW VIEWS
+# ============================================================================
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def user_list(request):
+    """
+    Get list of users with follow stats (for discovering users to follow)
+    """
+    # Exclude the current user from the list if authenticated
+    queryset = User.objects.all().order_by('-date_joined')
+    if request.user.is_authenticated:
+        queryset = queryset.exclude(id=request.user.id)
+    
+    # Add search functionality with improved relevance scoring
+    search = request.GET.get('search', '')
+    if search:
+        queryset = queryset.filter(
+            Q(username__icontains=search) |
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(email__icontains=search)
+        ).annotate(
+            # Add search relevance scoring for better ordering
+            search_priority=Case(
+                # Exact username match gets highest priority
+                When(username__iexact=search, then=Value(1)),
+                # First name exact match
+                When(first_name__iexact=search, then=Value(2)),
+                # Last name exact match  
+                When(last_name__iexact=search, then=Value(3)),
+                # Username starts with search
+                When(username__istartswith=search, then=Value(4)),
+                # First name starts with search
+                When(first_name__istartswith=search, then=Value(5)),
+                # Last name starts with search
+                When(last_name__istartswith=search, then=Value(6)),
+                # Default: contains search term
+                default=Value(7),
+                output_field=IntegerField()
+            )
+        ).order_by('search_priority', 'first_name', 'last_name', 'username')
+    else:
+        # Default ordering when no search - prioritize users with complete names
+        queryset = queryset.annotate(
+            has_full_name=Case(
+                When(Q(first_name__isnull=False) & Q(last_name__isnull=False) & 
+                     ~Q(first_name='') & ~Q(last_name=''), then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField()
+            )
+        ).order_by('has_full_name', 'first_name', 'last_name', 'username')
+    
+    # Paginate results
+    paginator = StandardResultsSetPagination()
+    page = paginator.paginate_queryset(queryset, request)
+    
+    serializer = UserProfileSerializer(page, many=True, context={'request': request})
+    return paginator.get_paginated_response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def user_profile(request, user_id):
+    """
+    Get detailed profile of a specific user
+    """
+    user = get_object_or_404(User, id=user_id)
+    serializer = UserProfileSerializer(user, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def follow_user(request):
+    """
+    Follow a user
+    """
+    serializer = FollowActionSerializer(data=request.data, context={'request': request})
+    
+    if serializer.is_valid():
+        user_id = serializer.validated_data['user_id']
+        following_user = User.objects.get(id=user_id)
+        
+        # Check if already following
+        follow_obj, created = Follow.objects.get_or_create(
+            follower=request.user,
+            following=following_user
+        )
+        
+        if created:
+            return Response({
+                'message': f'You are now following {following_user.username}',
+                'following': UserProfileSerializer(following_user, context={'request': request}).data
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                'message': f'You are already following {following_user.username}'
+            }, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def unfollow_user(request):
+    """
+    Unfollow a user
+    """
+    serializer = FollowActionSerializer(data=request.data, context={'request': request})
+    
+    if serializer.is_valid():
+        user_id = serializer.validated_data['user_id']
+        following_user = User.objects.get(id=user_id)
+        
+        try:
+            follow_obj = Follow.objects.get(
+                follower=request.user,
+                following=following_user
+            )
+            follow_obj.delete()
+            
+            return Response({
+                'message': f'You are no longer following {following_user.username}',
+                'user': UserProfileSerializer(following_user, context={'request': request}).data
+            }, status=status.HTTP_200_OK)
+        
+        except Follow.DoesNotExist:
+            return Response({
+                'message': f'You are not following {following_user.username}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def my_following(request):
+    """
+    Get list of users that current user is following
+    """
+    following_relationships = Follow.objects.filter(
+        follower=request.user
+    ).select_related('following').order_by('-created_at')
+    
+    # Create custom serializer data
+    following_data = []
+    for follow in following_relationships:
+        user_data = UserProfileSerializer(follow.following, context={'request': request}).data
+        following_data.append({
+            'id': follow.id,
+            'user': user_data,
+            'created_at': follow.created_at
+        })
+    
+    return Response({
+        'count': following_relationships.count(),
+        'following': following_data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def my_followers(request):
+    """
+    Get list of users that are following current user
+    """
+    follower_relationships = Follow.objects.filter(
+        following=request.user
+    ).select_related('follower').order_by('-created_at')
+    
+    # Create custom serializer data
+    followers_data = []
+    for follow in follower_relationships:
+        user_data = UserProfileSerializer(follow.follower, context={'request': request}).data
+        followers_data.append({
+            'id': follow.id,
+            'user': user_data,
+            'created_at': follow.created_at
+        })
+    
+    return Response({
+        'count': follower_relationships.count(),
+        'followers': followers_data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def user_following(request, user_id):
+    """
+    Get list of users that a specific user is following
+    """
+    user = get_object_or_404(User, id=user_id)
+    following_relationships = Follow.objects.filter(
+        follower=user
+    ).select_related('following').order_by('-created_at')
+    
+    # Create custom serializer data
+    following_data = []
+    for follow in following_relationships:
+        user_data = UserProfileSerializer(follow.following, context={'request': request}).data
+        following_data.append({
+            'id': follow.id,
+            'user': user_data,
+            'created_at': follow.created_at
+        })
+    
+    return Response({
+        'user': UserProfileSerializer(user, context={'request': request}).data,
+        'count': following_relationships.count(),
+        'following': following_data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def user_followers(request, user_id):
+    """
+    Get list of users that are following a specific user
+    """
+    user = get_object_or_404(User, id=user_id)
+    follower_relationships = Follow.objects.filter(
+        following=user
+    ).select_related('follower').order_by('-created_at')
+    
+    # Create custom serializer data
+    followers_data = []
+    for follow in follower_relationships:
+        user_data = UserProfileSerializer(follow.follower, context={'request': request}).data
+        followers_data.append({
+            'id': follow.id,
+            'user': user_data,
+            'created_at': follow.created_at
+        })
+    
+    return Response({
+        'user': UserProfileSerializer(user, context={'request': request}).data,
+        'count': follower_relationships.count(),
+        'followers': followers_data
     })
