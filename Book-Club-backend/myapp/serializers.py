@@ -135,7 +135,6 @@ class MembershipSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'role', 'joined_at', 'is_active']
 
 
-# Book Club Serializers
 class BookClubListSerializer(serializers.ModelSerializer):
     """Simplified serializer for book club lists"""
     creator = UserSerializer(read_only=True)
