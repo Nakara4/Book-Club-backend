@@ -54,6 +54,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://nakara4.github.io",  # GitHub Pages debug branch
 ]
 
 # Disable CSRF for easier API testing in debug mode
@@ -62,6 +63,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://nakara4.github.io",  # GitHub Pages debug branch
 ]
 
 # Enable Django Debug Toolbar if available
