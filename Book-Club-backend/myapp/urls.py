@@ -3,7 +3,6 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from . import analytics_views
 
-# Create router for ViewSets
 router = DefaultRouter()
 router.register(r'bookclubs', views.BookClubViewSet, basename='bookclub')
 
