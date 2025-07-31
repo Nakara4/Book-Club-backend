@@ -1,0 +1,87 @@
+[
+  {
+    "model": "myapp.bookclub",
+    "pk": 1,
+    "fields": {
+      "name": "Classic Literature Society",
+      "description": "A book club dedicated to exploring the greatest works of classic literature from around the world. We dive deep into the themes, historical context, and enduring relevance of timeless masterpieces.",
+      "creator": 192,
+      "image": "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=500&h=500&fit=crop&crop=center",
+      "category": "Classic Literature",
+      "is_private": false,
+      "max_members": 30,
+      "location": "Downtown Library, Conference Room A",
+      "meeting_frequency": "Monthly",
+      "created_at": "2024-01-15T10:00:00Z",
+      "updated_at": "2024-01-15T10:00:00Z"
+    }
+  },
+  {
+    "model": "myapp.bookclub",
+    "pk": 2,
+    "fields": {
+      "name": "Sci-Fi Explorers",
+      "description": "Journey through space, time, and alternate realities with fellow science fiction enthusiasts. From hard science fiction to space opera, we explore the genre's best works and discuss their implications for our future.",
+      "creator": 193,
+      "image": "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=500&h=500&fit=crop&crop=center",
+      "category": "Science Fiction",
+      "is_private": false,
+      "max_members": 25,
+      "location": "Virtual - Discord Server",
+      "meeting_frequency": "Bi-weekly",
+      "created_at": "2024-02-01T14:30:00Z",
+      "updated_at": "2024-02-01T14:30:00Z"
+    }
+  },
+  {
+    "model": "myapp.bookclub",
+    "pk": 3,
+    "fields": {
+      "name": "Mystery & Thriller Corner",
+      "description": "Unravel mysteries and experience heart-pounding thrills with our dedicated crime fiction book club. From cozy mysteries to psychological thrillers, we love books that keep us guessing until the very end.",
+      "creator": 194,
+      "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=500&h=500&fit=crop&crop=center",
+      "category": "Mystery & Thriller",
+      "is_private": false,
+      "max_members": 40,
+      "location": "Barnes & Noble Cafe",
+      "meeting_frequency": "Monthly",
+      "created_at": "2024-01-20T16:45:00Z",
+      "updated_at": "2024-01-20T16:45:00Z"
+    }
+  },
+  {
+    "model": "myapp.bookclub",
+    "pk": 4,
+    "fields": {
+      "name": "Contemporary Fiction Club",
+      "description": "Explore the voices and stories of today with our contemporary fiction book club. We focus on recent publications that capture the spirit of our times and offer fresh perspectives on modern life.",
+      "creator": 188,
+      "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop&crop=center",
+      "category": "Contemporary Fiction",
+      "is_private": true,
+      "max_members": 15,
+      "location": "Members' homes (rotating)",
+      "meeting_frequency": "Monthly",
+      "created_at": "2024-03-10T12:15:00Z",
+      "updated_at": "2024-03-10T12:15:00Z"
+    }
+  },
+  {
+    "model": "myapp.bookclub",
+    "pk": 5,
+    "fields": {
+      "name": "Non-Fiction Minds",
+      "description": "Expand your knowledge and challenge your thinking with our non-fiction book club. We cover biographies, history, science, philosophy, and self-improvement books that educate and inspire.",
+      "creator": 189,
+      "image": "https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=500&h=500&fit=crop&crop=center",
+      "category": "Non-Fiction",
+      "is_private": false,
+      "max_members": 35,
+      "location": "University Community Center",
+      "meeting_frequency": "Bi-weekly",
+      "created_at": "2024-02-28T09:30:00Z",
+      "updated_at": "2024-02-28T09:30:00Z"
+    }
+  }
+]

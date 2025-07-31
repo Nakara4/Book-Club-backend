@@ -1,0 +1,45 @@
+[flake8]
+max-line-length = 88
+max-complexity = 10
+exclude = 
+    .git,
+    __pycache__,
+    migrations,
+    .venv,
+    venv,
+    env,
+    .env,
+    build,
+    dist,
+    .tox
+
+# Error codes to ignore
+ignore = 
+    # Line too long (handled by black)
+    E501,
+    # Line break before binary operator (black compatibility)
+    W503,
+    # Line break after binary operator (black compatibility)  
+    W504,
+
+# Error codes to always check
+select = 
+    # Syntax errors and undefined names
+    E9,F63,F7,F82,
+    # Import issues
+    F401,F402,F403,F405,
+    # Variable issues  
+    F811,F812,F821,F822,F823,F831,
+    # Other important errors
+    E713,E714,E721,E722,E741,E742,E743,
+    W191,W292,W293,W601,W602,W603,W604,W605,W606
+
+per-file-ignores =
+    # Django settings files can have unused imports
+    */settings/*.py:F401,F403
+    # Test files can have unused imports and variables
+    */tests/*.py:F401,F841
+    # Management commands can have unused imports
+    */management/commands/*.py:F401
+    # __init__.py files often have unused imports for module setup
+    __init__.py:F401
