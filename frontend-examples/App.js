@@ -1,6 +1,3 @@
-// src/App.js
-// This file shows how to structure your main App component with protected routes
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
