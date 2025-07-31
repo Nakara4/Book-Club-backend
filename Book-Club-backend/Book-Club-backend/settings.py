@@ -38,7 +38,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'Book-Club-backend.Book-Club-backend.urls'
+ROOT_URLCONF = 'Book-Club-backend.urls'
 
 TEMPLATES = [
     {
@@ -56,7 +56,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'Book-Club-backend.Book-Club-backend.wsgi.application'
+WSGI_APPLICATION = 'Book-Club-backend.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
