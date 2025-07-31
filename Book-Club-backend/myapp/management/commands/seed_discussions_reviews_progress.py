@@ -285,10 +285,13 @@ class Command(BaseCommand):
             club_members = list(session.book_club.members.all())
             
             # Select random subset of members to have progress
-            active_readers = random.sample(
-                club_members, 
-                min(random.randint(3, len(club_members)), len(club_members))
-            )
+            if len(club_members) < 3:
+                active_readers = club_members
+            else:
+                active_readers = random.sample(
+                    club_members, 
+                    random.randint(min(3, len(club_members)), len(club_members))
+                )
             
             for user in active_readers:
                 if created_progress >= num_progress:
@@ -333,17 +336,25 @@ class Command(BaseCommand):
 
                 finished_at = updated_at if is_finished else None
 
-                ReadingProgress.objects.create(
-                    user=user,
-                    book=session.book,
-                    reading_session=session,
-                    current_page=current_page,
-                    is_finished=is_finished,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    notes=self.fake.text(max_nb_chars=100) if random.random() < 0.3 else None,
-                    updated_at=updated_at
-                )
+                # Check if progress already exists for this user, book, and session
+                if not ReadingProgress.objects.filter(
+                    user=user, 
+                    book=session.book, 
+                    reading_session=session
+                ).exists():
+                    ReadingProgress.objects.create(
+                        user=user,
+                        book=session.book,
+                        reading_session=session,
+                        current_page=current_page,
+                        is_finished=is_finished,
+                        started_at=started_at,
+                        finished_at=finished_at,
+                        notes=self.fake.text(max_nb_chars=100) if random.random() < 0.3 else None,
+                        updated_at=updated_at
+                    )
+                else:
+                    continue  # Skip if progress already exists
                 
                 created_progress += 1
 
@@ -407,15 +418,20 @@ class Command(BaseCommand):
                 
                 # Generate realistic vote counts
                 total_members = len(club_members)
-                if status == 'approved' or status == 'selected':
-                    votes_for = random.randint(max(1, total_members // 3), total_members - 1)
-                    votes_against = random.randint(0, total_members // 4)
-                elif status == 'rejected':
-                    votes_for = random.randint(0, total_members // 4)
-                    votes_against = random.randint(max(1, total_members // 3), total_members - 1)
-                else:  # pending
-                    votes_for = random.randint(0, total_members // 2)
-                    votes_against = random.randint(0, total_members // 3)
+                if total_members <= 2:
+                    # Small clubs - simple voting
+                    votes_for = random.randint(0, total_members)
+                    votes_against = random.randint(0, total_members - votes_for)
+                else:
+                    if status == 'approved' or status == 'selected':
+                        votes_for = random.randint(max(1, total_members // 3), total_members - 1)
+                        votes_against = random.randint(0, total_members // 4)
+                    elif status == 'rejected':
+                        votes_for = random.randint(0, total_members // 4)
+                        votes_against = random.randint(max(1, total_members // 3), total_members - 1)
+                    else:  # pending
+                        votes_for = random.randint(0, total_members // 2)
+                        votes_against = random.randint(0, total_members // 3)
 
                 created_time = self.fake.date_time_between(
                     start_date='-60d',

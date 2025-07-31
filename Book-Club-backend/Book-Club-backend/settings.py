@@ -133,7 +133,8 @@ SIMPLE_JWT = {
 SEED_ON_STARTUP = os.getenv('SEED_ON_STARTUP', 'False').lower() == 'true'
 
 # CORS settings for React frontend
-cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
+default_origins = 'http://localhost:3000,http://127.0.0.1:3000,https://nakara4.github.io'
+cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', default_origins)
 CORS_ALLOWED_ORIGINS = []
 for origin in cors_origins_raw.split(','):
     origin = origin.strip()
