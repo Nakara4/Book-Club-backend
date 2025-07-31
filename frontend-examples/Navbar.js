@@ -1,6 +1,3 @@
-// src/components/Navbar.js
-// This file shows how to properly display navigation based on user role
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
