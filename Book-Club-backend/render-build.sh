@@ -19,6 +19,10 @@ python manage.py collectstatic --noinput
 echo "🗄️  Running database migrations..."
 python manage.py migrate
 
+# Create initial admin user if it doesn't exist
+echo "👤 Creating initial admin user..."
+python manage.py create_initial_admin
+
 # Check if seeding should run on startup
 if [[ "${SEED_ON_STARTUP}" == "true" ]]; then
     echo "🌱 SEED_ON_STARTUP is enabled - running production seeding..."
