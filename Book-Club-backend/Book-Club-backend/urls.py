@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.generic import RedirectView
 from rest_framework_simplejwt.views import (
     TokenRefreshView,
@@ -22,6 +22,15 @@ urlpatterns = [
     # Home page (keep this last to avoid conflicts)
     path('', include('myapp.urls')),  # Home and legacy routes
 ]
+
+
+def handler404(request, exception):
+    return JsonResponse({'detail': 'Not found'}, status=404)
+
+
+def handler500(request):
+    return JsonResponse({'detail': 'Internal server error'}, status=500)
+
 
 # Serve media files during development
 if settings.DEBUG:
